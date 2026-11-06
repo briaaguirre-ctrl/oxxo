@@ -111,7 +111,38 @@ class SistemaOXXO:
                     producto.stock
                 )
             )
+            
+    def actualizar_productos_venta(self):
+        for fila in self.tabla_productos_venta.get_children():
+            self.tabla_productos_venta.delete(fila)
 
+        for producto in self.inventario.listar_productos():
+            self.tabla_productos_venta.insert(
+                "",
+                "end",
+                values=(
+                    producto.nombre,
+                    f"${producto.precio:,}"
+                )
+            )
+    
+    def filtrar_productos_venta(self, evento=None):
+        busqueda = self.buscar_venta.get().lower()
+
+        for fila in self.tabla_productos_venta.get_children():
+            self.tabla_productos_venta.delete(fila)
+
+        for producto in self.inventario.listar_productos():
+            if busqueda in producto.nombre.lower():
+                self.tabla_productos_venta.insert(
+                    "",
+                    "end",
+                    values=(
+                        producto.nombre,
+                        f"${producto.precio:,}"
+                    )
+                )
+            
     def producto_seleccionado(self):
         seleccion = self.tabla_inventario.selection()
 
@@ -225,19 +256,41 @@ class SistemaOXXO:
 
 
     def crear_pestaña_ventas(self):
+        
         tk.Label(
             self.pestaña_ventas,
             text="Realizar una venta",
             font=("Arial", 14, "bold")
         ).pack(pady=10)
-
+        
         tk.Label(
             self.pestaña_ventas,
-            text="Selecciona un producto en la pestaña Inventario "
-                 "y luego agrégalo a la venta."
-        ).pack(pady=5)
+            text="Buscar producto:"
+            ).pack(pady=5)
+        
+        self.buscar_venta = tk.Entry(
+            self.pestaña_ventas,
+            width=35
+            )
+        self.buscar_venta.pack(pady=5)
+        self.buscar_venta.bind("<KeyRelease>", self.filtrar_productos_venta)
+        columnas_productos = ("nombre", "precio")
 
-        tk.Button(
+        self.tabla_productos_venta = ttk.Treeview(
+            self.pestaña_ventas,
+            columns=columnas_productos,
+            show="headings",
+            height=6
+        )
+        self.tabla_productos_venta.heading("nombre", text="Producto")
+        self.tabla_productos_venta.heading("precio", text="Precio")
+
+        self.tabla_productos_venta.pack(
+            fill="x", padx=10, pady=10
+        )
+        self.actualizar_productos_venta()
+
+        ttk.Button(
             self.pestaña_ventas,
             text="Agregar producto seleccionado",
             command=self.agregar_a_venta
@@ -297,10 +350,29 @@ class SistemaOXXO:
             fg="white",
             font=("Arial", 11, "bold")
         ).pack(pady=10)
-
+        
     def agregar_a_venta(self):
-        codigo = self.producto_seleccionado()
+        seleccion = self.tabla_productos_venta.selection()
+
+        if not seleccion:
+            messagebox.showwarning(
+                "Atención", "Selecciona un producto primero."
+            )
+            return
+
+        nombre = self.tabla_productos_venta.item(
+            seleccion[0], "values"
+        )[0]
+
+        codigo = None
+
+        for producto in self.inventario.listar_productos():
+            if producto.nombre == nombre:
+                codigo = producto.codigo
+                break
+
         if codigo is None:
+            messagebox.showerror("Error", "Producto no encontrado.")
             return
 
         cantidad = simpledialog.askinteger(
@@ -335,6 +407,7 @@ class SistemaOXXO:
 
         total = self.venta.calcular_total()
         self.etiqueta_total.config(text=f"Total: ${total:,}")
+        self.ventana.update_idletasks()
 
     def confirmar_venta(self):
         metodo = self.metodo_pago.get().lower()
